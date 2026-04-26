@@ -248,3 +248,180 @@ class PineconeAPI:
             return []
 
 import asyncio
+
+class ResumeParserAPI:
+    """Resume parsing and skill extraction"""
+    
+    @staticmethod
+    async def extract_resume_skills(resume_text: str) -> Dict[str, Any]:
+        """
+        Extract skills, experience, and education from resume text
+        """
+        try:
+            response = openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an expert resume parser. Extract information from resumes and provide:
+                        1. Technical skills (programming languages, frameworks, tools)
+                        2. Soft skills (communication, leadership, etc.)
+                        3. Years of experience (overall)
+                        4. Work experience (companies, roles, key responsibilities)
+                        5. Education (degrees, institutions)
+                        6. Certifications
+                        
+                        Respond in JSON format with keys: technical_skills, soft_skills, years_of_experience, 
+                        work_experience (list of {company, role, years, key_points}), 
+                        education (list of {degree, institution, field}),
+                        certifications (list of {name, issuer})"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Extract skills and information from this resume:\n\n{resume_text}"
+                    }
+                ],
+                temperature=0.3,
+            )
+            
+            content = response.choices[0].message.content
+            import json
+            extraction = json.loads(content)
+            return extraction
+            
+        except Exception as e:
+            logger.error(f"Resume parsing error: {str(e)}")
+            raise
+
+    @staticmethod
+    async def extract_skills_from_file(file_path: str) -> Dict[str, Any]:
+        """
+        Extract skills from resume file (PDF or DOCX)
+        """
+        try:
+            from PyPDF2 import PdfReader
+            from docx import Document
+            
+            resume_text = ""
+            
+            # Handle PDF files
+            if file_path.endswith('.pdf'):
+                with open(file_path, 'rb') as file:
+                    pdf_reader = PdfReader(file)
+                    for page in pdf_reader.pages:
+                        resume_text += page.extract_text()
+            
+            # Handle DOCX files
+            elif file_path.endswith('.docx'):
+                doc = Document(file_path)
+                for paragraph in doc.paragraphs:
+                    resume_text += paragraph.text + "\n"
+            
+            else:
+                # Assume plain text
+                with open(file_path, 'r') as file:
+                    resume_text = file.read()
+            
+            # Extract skills from text
+            return await ResumeParserAPI.extract_resume_skills(resume_text)
+            
+        except Exception as e:
+            logger.error(f"File parsing error: {str(e)}")
+            raise
+
+class GroqAPI:
+    """Groq API for concept teaching and explanations"""
+    
+    @staticmethod
+    async def teach_concept(skill_name: str, level: str = "beginner") -> Dict[str, Any]:
+        """
+        Use Groq to teach a concept
+        skill_name: The skill or concept to teach
+        level: beginner, intermediate, advanced
+        """
+        try:
+            from groq import Groq
+            
+            client = Groq(api_key=settings.GROQ_API_KEY)
+            
+            prompt = f"""You are an expert technical educator. Explain the concept of '{skill_name}' 
+            at a {level} level. Include:
+            1. Definition and overview
+            2. Why it's important
+            3. Real-world applications
+            4. Key concepts to understand
+            5. Common mistakes to avoid
+            6. Learning path recommendations
+            7. Practice exercises
+            
+            Make it clear, concise, and engaging."""
+            
+            message = client.messages.create(
+                model="mixtral-8x7b-32768",
+                max_tokens=2048,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            explanation = message.content[0].text if message.content else ""
+            
+            return {
+                "skill": skill_name,
+                "level": level,
+                "explanation": explanation,
+                "generated_at": str(__import__('datetime').datetime.utcnow())
+            }
+            
+        except Exception as e:
+            logger.error(f"Groq API error: {str(e)}")
+            raise
+
+    @staticmethod
+    async def generate_learning_recommendations(skill_gaps: List[str], resume_skills: List[str]) -> Dict[str, Any]:
+        """
+        Generate personalized learning recommendations based on skill gaps
+        """
+        try:
+            from groq import Groq
+            
+            client = Groq(api_key=settings.GROQ_API_KEY)
+            
+            gaps_str = ", ".join(skill_gaps[:10])
+            resume_str = ", ".join(resume_skills[:10])
+            
+            prompt = f"""Based on the following information, generate a personalized learning plan:
+
+Current Skills from Resume: {resume_str}
+
+Skill Gaps to Fill: {gaps_str}
+
+Please provide:
+1. Priority order of skills to learn
+2. For each skill: learning approach, estimated time, and resources
+3. Milestones and checkpoints
+4. How to practice and apply these skills
+5. Timeline recommendations
+
+Be specific and practical."""
+            
+            message = client.messages.create(
+                model="mixtral-8x7b-32768",
+                max_tokens=3000,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            recommendations = message.content[0].text if message.content else ""
+            
+            return {
+                "skill_gaps": skill_gaps,
+                "current_skills": resume_skills,
+                "recommendations": recommendations,
+                "generated_at": str(__import__('datetime').datetime.utcnow())
+            }
+            
+        except Exception as e:
+            logger.error(f"Groq recommendations error: {str(e)}")
+            raise

@@ -233,6 +233,69 @@ class CompanyIntelligenceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Resume Schemas
+class ResumeUploadRequest(BaseModel):
+    """Request for resume upload"""
+    file_name: str
+    is_primary: bool = True
+
+class ResumeResponse(BaseModel):
+    """Resume response"""
+    id: int
+    file_name: str
+    extracted_skills: List[str]
+    extracted_experience: Optional[Dict[str, Any]]
+    extracted_education: Optional[Dict[str, Any]]
+    summary: Optional[str]
+    is_primary: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class SkillGapAnalysisResponse(BaseModel):
+    """Skill gap analysis response"""
+    id: int
+    resume_skills: List[str]
+    required_skills: List[str]
+    matching_skills: List[str]
+    gap_skills: List[str]
+    gap_percentage: float
+    priority_skills: List[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Performance Schemas
+class PerformanceResponse(BaseModel):
+    """Performance tracking response"""
+    id: int
+    activity_type: str
+    score: Optional[float]
+    time_taken_seconds: Optional[int]
+    feedback: Optional[str]
+    skill_tags: List[str]
+    completed_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Learning Recommendations
+class LearningRecommendationResponse(BaseModel):
+    """Learning recommendations response"""
+    skill_gaps: List[str]
+    current_skills: List[str]
+    recommendations: str
+    generated_at: str
+
+class ConceptExplanationResponse(BaseModel):
+    """Concept explanation response"""
+    skill: str
+    level: str
+    explanation: str
+    generated_at: str
+
 # Error Response
 class ErrorResponse(BaseModel):
     detail: str

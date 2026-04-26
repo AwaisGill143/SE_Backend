@@ -20,31 +20,37 @@ class LearningPathService:
         job_analysis_id: int
     ) -> LearningPath:
         """
-        Create a personalized learning path based on job analysis
+        Create a personalized learning path based on job analysis and resume
         """
         try:
             from app.services.job_service import JobService
+            from app.services.resume_service import ResumeService
             
             # Get job analysis
             job_analysis = JobService.get_job_analysis(db, job_analysis_id)
             if not job_analysis:
                 raise ValueError("Job analysis not found")
             
-            # Get skill gaps
-            skill_gaps = await LearningPathService._get_prioritized_skill_gaps(
-                job_analysis.skill_gaps
-            )
+            # Get skill gap analysis with resume comparison
+            skill_gap_analysis = ResumeService.get_skill_gap_analysis(db, user_id, job_analysis_id)
             
-            # Get learning resources
-            resources = await LearningPathService._get_learning_resources(skill_gaps)
+            if not skill_gap_analysis:
+                # Create skill gap analysis if doesn't exist
+                skill_gap_analysis = await ResumeService.analyze_skill_gaps(db, user_id, job_analysis_id)
+            
+            # Use gap skills from analysis
+            priority_skills = skill_gap_analysis.priority_skills or skill_gap_analysis.gap_skills[:5]
+            
+            # Get learning resources focused on gap skills
+            resources = await LearningPathService._get_learning_resources(priority_skills)
             
             # Create learning path
             learning_path = LearningPath(
                 user_id=user_id,
                 job_analysis_id=job_analysis_id,
-                title=f"Learning Path for {job_analysis.job_description[:50]}",
-                description="Personalized learning path based on job requirements",
-                skill_gaps=[gap['skill'] for gap in skill_gaps],
+                title=f"Learning Path - {job_analysis.job_description[:30]}...",
+                description=f"Personalized path to close {len(skill_gap_analysis.gap_skills)} skill gaps",
+                skill_gaps=skill_gap_analysis.gap_skills,
                 recommended_resources=resources.get('resources', []),
                 video_playlists=resources.get('videos', []),
                 estimated_hours=resources.get('estimated_hours', 0)
@@ -54,12 +60,12 @@ class LearningPathService:
             db.commit()
             db.refresh(learning_path)
             
-            # Create learning modules
+            # Create learning modules with concept teaching from Groq
             await LearningPathService._create_learning_modules(
-                db, learning_path.id, resources
+                db, learning_path.id, priority_skills, resources
             )
             
-            logger.info(f"Learning path created for user {user_id}")
+            logger.info(f"Learning path created for user {user_id} with {len(priority_skills)} focus skills")
             return learning_path
             
         except Exception as e:
@@ -77,41 +83,47 @@ class LearningPathService:
         )
     
     @staticmethod
-    async def _get_learning_resources(skill_gaps: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Gather learning resources for skill gaps"""
+    async def _get_learning_resources(skills: List[str]) -> Dict[str, Any]:
+        """Gather learning resources for skills"""
         try:
             resources = []
             videos = []
             total_hours = 0
             
-            # Extract skill names
-            skills = [gap['skill'] for gap in skill_gaps[:5]]  # Top 5 skills
-            
-            # Get YouTube videos
-            video_results = await YouTubeAPI.search_learning_videos(skills)
+            # Get YouTube videos for each skill
+            video_results = await YouTubeAPI.search_learning_videos(skills, max_results=3)
             videos.extend(video_results)
             
-            # Add other resources
-            resources.append({
-                'type': 'documentation',
-                'title': 'Official Documentation',
-                'url': 'https://docs.example.com'
-            })
+            # Add curated resources based on skills
+            resource_map = {
+                "React.js": "https://react.dev",
+                "TypeScript": "https://www.typescriptlang.org/docs",
+                "System Design": "https://www.youtube.com/results?search_query=system+design+interview",
+                "Python": "https://docs.python.org/3",
+                "Docker": "https://docs.docker.com",
+                "AWS": "https://aws.amazon.com/training",
+                "GraphQL": "https://graphql.org/learn",
+                "Machine Learning": "https://www.coursera.org/specializations/machine-learning",
+            }
             
-            resources.append({
-                'type': 'course',
-                'title': 'Online Courses',
-                'url': 'https://udemy.com'
-            })
+            for skill in skills[:5]:
+                url = resource_map.get(skill, f"https://www.udemy.com/courses/search/?q={skill.replace(' ', '+')}")
+                resources.append({
+                    'type': 'course',
+                    'title': f'{skill} - Complete Course',
+                    'url': url
+                })
             
-            resources.append({
-                'type': 'project',
-                'title': 'Build Projects to Practice',
-                'url': 'https://github.com'
-            })
+            # Add generic resources
+            if not resources:
+                resources.append({
+                    'type': 'documentation',
+                    'title': 'Official Documentation',
+                    'url': 'https://docs.example.com'
+                })
             
-            # Estimate hours (10 hours per gap)
-            total_hours = len(skill_gaps) * 10
+            # Estimate hours (8 hours per skill)
+            total_hours = len(skills) * 8
             
             return {
                 'resources': resources,
@@ -127,16 +139,46 @@ class LearningPathService:
     async def _create_learning_modules(
         db: Session,
         learning_path_id: int,
+        skills: List[str],
         resources: Dict[str, Any]
     ) -> None:
-        """Create learning modules for a learning path"""
+        """Create learning modules with concept teaching for a learning path"""
         try:
-            # Create module for each video
-            for idx, video in enumerate(resources.get('videos', [])[:10]):
+            from app.utils.external_apis import GroqAPI
+            
+            # Create concept teaching modules using Groq
+            for idx, skill in enumerate(skills[:5]):  # Top 5 skills
+                # Get Groq explanation for the concept
+                try:
+                    explanation = await GroqAPI.teach_concept(skill, "beginner")
+                    
+                    module = LearningModule(
+                        learning_path_id=learning_path_id,
+                        title=f"Learn {skill} - Concept Explanation",
+                        description=f"AI-powered explanation of {skill} fundamentals",
+                        resource_type='concept',
+                        resource_url='',  # Internal content
+                        estimated_hours=2.0
+                    )
+                except:
+                    # Fallback if Groq fails
+                    module = LearningModule(
+                        learning_path_id=learning_path_id,
+                        title=f"Master {skill}",
+                        description=f"Complete guide to understanding {skill}",
+                        resource_type='course',
+                        resource_url='https://www.udemy.com',
+                        estimated_hours=2.0
+                    )
+                
+                db.add(module)
+            
+            # Create modules for YouTube videos
+            for idx, video in enumerate(resources.get('videos', [])[:5]):
                 module = LearningModule(
                     learning_path_id=learning_path_id,
                     title=video.get('title', f'Video {idx+1}'),
-                    description=f"Watch this tutorial to learn {video.get('channel', 'the topic')}",
+                    description=f"Video tutorial by {video.get('channel', 'Expert')}: {video.get('title', 'Learning material')}",
                     resource_type='video',
                     resource_url=video.get('url', ''),
                     estimated_hours=1.5
@@ -144,7 +186,7 @@ class LearningPathService:
                 db.add(module)
             
             # Create modules for other resources
-            for resource in resources.get('resources', []):
+            for resource in resources.get('resources', [])[:5]:
                 module = LearningModule(
                     learning_path_id=learning_path_id,
                     title=resource.get('title', 'Resource'),

@@ -207,3 +207,62 @@ class CompanyIntelligence(Base):
     average_interview_duration = Column(Float)
     candidates_count = Column(Integer, default=0)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Resume(Base):
+    """User resume model"""
+    __tablename__ = "resumes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    file_url = Column(String)  # S3 or storage URL
+    file_name = Column(String)
+    extracted_skills = Column(JSON)  # Skills extracted from resume
+    extracted_experience = Column(JSON)  # Experience details
+    extracted_education = Column(JSON)  # Education details
+    summary = Column(Text, nullable=True)  # Resume summary
+    is_primary = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    user = relationship("User", backref="resumes")
+
+class Performance(Base):
+    """User performance tracking model"""
+    __tablename__ = "performances"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=True)
+    interview_id = Column(Integer, ForeignKey("interviews.id"), nullable=True)
+    learning_module_id = Column(Integer, ForeignKey("learning_modules.id"), nullable=True)
+    activity_type = Column(String)  # assessment, interview, learning, practice
+    score = Column(Float, nullable=True)
+    time_taken_seconds = Column(Integer, nullable=True)
+    feedback = Column(Text, nullable=True)
+    skill_tags = Column(JSON)  # Skills practiced in this session
+    completed_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", backref="performances")
+
+class SkillGapAnalysis(Base):
+    """Skill gap analysis model comparing resume vs job requirements"""
+    __tablename__ = "skill_gap_analyses"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    job_analysis_id = Column(Integer, ForeignKey("job_analyses.id"))
+    resume_id = Column(Integer, ForeignKey("resumes.id"), nullable=True)
+    resume_skills = Column(JSON)  # Skills from resume
+    required_skills = Column(JSON)  # Skills required by job
+    matching_skills = Column(JSON)  # Skills user has
+    gap_skills = Column(JSON)  # Skills user needs to learn
+    gap_percentage = Column(Float)  # % of skills missing
+    priority_skills = Column(JSON)  # Top skills to focus on
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", backref="skill_gap_analyses")
+    job_analysis = relationship("JobAnalysis")
+    resume = relationship("Resume")

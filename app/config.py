@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # API Keys
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     YOUTUBE_API_KEY: str = ""
     JUDGE0_API_KEY: str = ""
     JUDGE0_API_URL: str = "https://judge0-ce.p.rapidapi.com"

@@ -1,16 +1,18 @@
 """
 User management endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from app.database import get_db
 from app.schemas import (
     UserCreate, UserResponse, UserUpdate, UserDetailResponse,
-    TokenRequest, TokenResponse, TokenRefresh, UserSkillCreate, UserSkillResponse
+    TokenRequest, TokenResponse, TokenRefresh, UserSkillCreate, UserSkillResponse,
+    ResumeResponse, SkillGapAnalysisResponse
 )
 from app.services.user_service import UserService
+from app.services.resume_service import ResumeService
 from app.utils.auth import (
     create_access_token, create_refresh_token, verify_token, 
     get_current_user, hash_password
@@ -220,3 +222,117 @@ async def delete_skill(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+# Resume endpoints
+
+@router.post("/me/resume/upload", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
+async def upload_resume(
+    file: UploadFile = File(...),
+    is_primary: bool = True,
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload and parse resume
+    """
+    user = UserService.get_user_by_email(db, email)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Validate file type
+    allowed_types = [".pdf", ".docx", ".txt"]
+    file_ext = "." + file.filename.split(".")[-1].lower()
+    
+    if file_ext not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type not allowed. Allowed types: {', '.join(allowed_types)}"
+        )
+    
+    try:
+        file_content = await file.read()
+        resume = await ResumeService.upload_resume(
+            db, user.id, file_content, file.filename, is_primary
+        )
+        return resume
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Resume upload failed: {str(e)}"
+        )
+
+@router.get("/me/resume/primary", response_model=ResumeResponse)
+async def get_primary_resume(
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get primary resume
+    """
+    user = UserService.get_user_by_email(db, email)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    resume = ResumeService.get_primary_resume(db, user.id)
+    
+    if not resume:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No primary resume found"
+        )
+    
+    return resume
+
+@router.get("/me/resume", response_model=list[ResumeResponse])
+async def get_my_resumes(
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all resumes for current user
+    """
+    user = UserService.get_user_by_email(db, email)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    resumes = ResumeService.get_user_resumes(db, user.id)
+    return resumes
+
+@router.get("/me/resume/{resume_id}", response_model=ResumeResponse)
+async def get_resume(
+    resume_id: int,
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get specific resume
+    """
+    user = UserService.get_user_by_email(db, email)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    resume = ResumeService.get_user_resume(db, user.id, resume_id)
+    
+    if not resume:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found"
+        )
+    
+    return resume
