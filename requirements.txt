@@ -30,3 +30,4 @@ celery>=5.3.0
 groq
 gunicorn
 pydantic[email]
+email-validator
