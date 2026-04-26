@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/careerlaunch_db"
+    DATABASE_URL: str = "postgresql://postgres:VIfBrmBrRE7r8Bxg@db.vhahbxcmnktadgtcadmx.supabase.co:5432/postgres"
     SQLALCHEMY_ECHO: bool = False
     
     # JWT/Security
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
     
     class Config:
         env_file = ".env"

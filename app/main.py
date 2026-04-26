@@ -9,7 +9,7 @@ import logging
 
 from app.config import settings
 from app.database import engine, Base, get_db
-from app.routers import users, jobs, learning_paths, assessments, interviews, health
+from app.routers import users, jobs, learning_paths, assessments, interviews, health, analytics
 from app.middleware.error_handler import error_handling_middleware
 
 # Setup logging
@@ -55,6 +55,7 @@ app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Job Parser"])
 app.include_router(learning_paths.router, prefix="/api/v1/learning-paths", tags=["Learning Paths"])
 app.include_router(assessments.router, prefix="/api/v1/assessments", tags=["Assessments"])
 app.include_router(interviews.router, prefix="/api/v1/interviews", tags=["Interviews"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 
 @app.get("/")
 async def root():
