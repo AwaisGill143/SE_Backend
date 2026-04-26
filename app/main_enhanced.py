@@ -39,6 +39,7 @@ class Settings:
         "http://127.0.0.1:8000",
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8081",
+        "https://dream-site-realized.vercel.app"
     ]
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
