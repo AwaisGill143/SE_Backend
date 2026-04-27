@@ -152,8 +152,6 @@ async def get_job_analysis(
         )
     
     return job_analysis
-            detail=f"Skill gap identification failed: {str(e)}"
-        )
 
 @router.get("/{analysis_id}/skill-gap-analysis", response_model=SkillGapAnalysisResponse)
 async def analyze_skill_gaps(
