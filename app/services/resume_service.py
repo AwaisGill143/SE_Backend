@@ -28,20 +28,32 @@ class ResumeService:
         Upload resume and extract skills
         """
         try:
-            # Save file temporarily to parse it
+            # Extract text and skills from resume file
             import tempfile
             import os
-            
+
+            extracted_data: Dict[str, Any] = {"technical_skills": [], "work_experience": [], "education": []}
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
                 tmp.write(file_content)
                 tmp_path = tmp.name
-            
+
             try:
-                # Extract skills from resume
                 extracted_data = await ResumeParserAPI.extract_skills_from_file(tmp_path)
+            except Exception as parse_err:
+                # Fallback: extract text and use Groq if OpenAI is unavailable
+                logger.warning(f"Primary parser failed ({parse_err}), using Groq fallback")
+                try:
+                    text = ResumeService._read_text(file_content, file_name)
+                    extracted_data = await ResumeService._extract_skills_groq(text)
+                except Exception as fallback_err:
+                    logger.warning(f"Groq fallback also failed ({fallback_err}), storing with empty skills")
             finally:
-                os.unlink(tmp_path)
-            
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
             # If is_primary, unset other primary resumes
             if is_primary:
                 db.query(Resume).filter(
@@ -76,6 +88,60 @@ class ResumeService:
             logger.error(f"Resume upload error: {str(e)}")
             raise
     
+    @staticmethod
+    def _read_text(file_content: bytes, file_name: str) -> str:
+        """Extract plain text from resume bytes, with PDF/DOCX support."""
+        fn = file_name.lower()
+        if fn.endswith(".pdf"):
+            try:
+                import io
+                from PyPDF2 import PdfReader
+                reader = PdfReader(io.BytesIO(file_content))
+                return " ".join(p.extract_text() or "" for p in reader.pages)
+            except Exception:
+                pass
+        elif fn.endswith(".docx"):
+            try:
+                import io
+                from docx import Document
+                doc = Document(io.BytesIO(file_content))
+                return "\n".join(p.text for p in doc.paragraphs)
+            except Exception:
+                pass
+        return file_content.decode("utf-8", errors="ignore")
+
+    @staticmethod
+    async def _extract_skills_groq(text: str) -> Dict[str, Any]:
+        """Extract skills via Groq as fallback."""
+        import json as _json
+        try:
+            from groq import Groq
+            from app.config import settings
+            client = Groq(api_key=settings.GROQ_API_KEY)
+            prompt = (
+                "Extract a JSON object with keys 'technical_skills' (list of strings), "
+                "'work_experience' (list), 'education' (list) from this resume. "
+                "Return ONLY valid JSON, no markdown.\n\nResume:\n" + text[:3000]
+            )
+            response = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=800,
+            )
+            raw = response.choices[0].message.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            parsed = _json.loads(raw)
+            return {
+                "technical_skills": parsed.get("technical_skills", []),
+                "work_experience": parsed.get("work_experience", []),
+                "education": parsed.get("education", []),
+            }
+        except Exception as e:
+            logger.warning(f"Groq skill extraction failed: {e}")
+            return {"technical_skills": [], "work_experience": [], "education": []}
+
     @staticmethod
     async def _update_user_skills(
         db: Session,

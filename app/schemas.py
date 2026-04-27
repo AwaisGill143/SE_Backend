@@ -243,10 +243,10 @@ class ResumeResponse(BaseModel):
     """Resume response"""
     id: int
     file_name: str
-    extracted_skills: List[str]
-    extracted_experience: Optional[Dict[str, Any]]
-    extracted_education: Optional[Dict[str, Any]]
-    summary: Optional[str]
+    extracted_skills: Optional[List[str]] = []
+    extracted_experience: Optional[Any] = None
+    extracted_education: Optional[Any] = None
+    summary: Optional[str] = None
     is_primary: bool
     created_at: datetime
     

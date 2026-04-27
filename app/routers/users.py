@@ -1,7 +1,7 @@
 """
 User management endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
@@ -228,7 +228,7 @@ async def delete_skill(
 @router.post("/me/resume/upload", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume(
     file: UploadFile = File(...),
-    is_primary: bool = True,
+    is_primary: bool = Form(default=True),
     email: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
