@@ -224,6 +224,7 @@ async def delete_skill(
         )
 
 # Resume endpoints
+# NOTE: Order matters! More specific routes must come before generic ones with path parameters
 
 @router.post("/me/resume/upload", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume(
@@ -291,25 +292,6 @@ async def get_primary_resume(
     
     return resume
 
-@router.get("/me/resume", response_model=list[ResumeResponse])
-async def get_my_resumes(
-    email: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get all resumes for current user
-    """
-    user = UserService.get_user_by_email(db, email)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    resumes = ResumeService.get_user_resumes(db, user.id)
-    return resumes
-
 @router.get("/me/resume/{resume_id}", response_model=ResumeResponse)
 async def get_resume(
     resume_id: int,
@@ -336,3 +318,22 @@ async def get_resume(
         )
     
     return resume
+
+@router.get("/me/resume", response_model=list[ResumeResponse])
+async def get_my_resumes(
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all resumes for current user
+    """
+    user = UserService.get_user_by_email(db, email)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    resumes = ResumeService.get_user_resumes(db, user.id)
+    return resumes

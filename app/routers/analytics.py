@@ -87,6 +87,7 @@ async def get_progress_analytics(
         )
 
 # Performance endpoints
+# NOTE: Order matters! More specific routes (/performance/stats) must come before generic ones (/performance)
 
 @router.post("/performance", response_model=PerformanceResponse, status_code=status.HTTP_201_CREATED)
 async def log_performance(
@@ -137,31 +138,6 @@ async def log_performance(
             detail=f"Failed to log performance: {str(e)}"
         )
 
-@router.get("/performance", response_model=List[PerformanceResponse])
-async def get_my_performance(
-    activity_type: str = None,
-    limit: int = 50,
-    email: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get user's performance history
-    """
-    user = UserService.get_user_by_email(db, email)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    query = db.query(Performance).filter(Performance.user_id == user.id)
-    
-    if activity_type:
-        query = query.filter(Performance.activity_type == activity_type)
-    
-    performances = query.order_by(Performance.completed_at.desc()).limit(limit).all()
-    return performances
-
 @router.get("/performance/stats")
 async def get_performance_stats(
     email: str = Depends(get_current_user),
@@ -207,3 +183,28 @@ async def get_performance_stats(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to get stats: {str(e)}"
         )
+
+@router.get("/performance")
+async def get_my_performance(
+    activity_type: str = None,
+    limit: int = 50,
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get user's performance history
+    """
+    user = UserService.get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    query = db.query(Performance).filter(Performance.user_id == user.id)
+    
+    if activity_type:
+        query = query.filter(Performance.activity_type == activity_type)
+    
+    performances = query.order_by(Performance.completed_at.desc()).limit(limit).all()
+    return performances

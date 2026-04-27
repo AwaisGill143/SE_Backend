@@ -17,6 +17,8 @@ from app.utils.external_apis import GroqAPI
 
 router = APIRouter()
 
+# NOTE: Order matters! More specific routes must come before generic ones with path parameters
+
 @router.post("/analyze", response_model=JobAnalysisResponse, status_code=status.HTTP_201_CREATED)
 async def analyze_job_description(
     job_data: JobAnalysisRequest,
@@ -42,32 +44,6 @@ async def analyze_job_description(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Job analysis failed: {str(e)}"
         )
-
-@router.get("/{analysis_id}", response_model=JobAnalysisResponse)
-async def get_job_analysis(
-    analysis_id: int,
-    email: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get a specific job analysis
-    """
-    user = UserService.get_user_by_email(db, email)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    job_analysis = JobService.get_job_analysis(db, analysis_id)
-    
-    if not job_analysis or job_analysis.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job analysis not found"
-        )
-    
-    return job_analysis
 
 @router.get("/user/my-analyses")
 async def get_my_analyses(
@@ -148,6 +124,34 @@ async def get_skill_gaps(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Skill gap identification failed: {str(e)}"
+        )
+
+@router.get("/{analysis_id}", response_model=JobAnalysisResponse)
+async def get_job_analysis(
+    analysis_id: int,
+    email: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific job analysis
+    """
+    user = UserService.get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    job_analysis = JobService.get_job_analysis(db, analysis_id)
+    
+    if not job_analysis or job_analysis.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job analysis not found"
+        )
+    
+    return job_analysis
             detail=f"Skill gap identification failed: {str(e)}"
         )
 
