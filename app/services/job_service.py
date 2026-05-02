@@ -159,7 +159,7 @@ class JobService:
             raise
 
     # ------------------------------------------------------------------ #
-    #  Combined helper — score + gaps in one DB round-trip                  #
+    #  Combined helper — score + gaps in one DB round-trip                 #
     # ------------------------------------------------------------------ #
 
     @staticmethod
